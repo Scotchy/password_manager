@@ -1,0 +1,8 @@
+[package]
+name = "pwd_manager"
+version = "0.1.0"
+authors = ["Scotchy <jules.tevissen@wanadoo.fr>"]
+edition = "2018"
+
+[dependencies]
+nat_messaging = { path = "../nat_messaging" }
