@@ -1,2 +1,2 @@
-Little password manager written in Rust. 
+A little password manager written in Rust. 
 In development.
