@@ -1,0 +1,39 @@
+name: PasswordManager
+version: "0.1.0"
+author: Drosos <sarradro@gmail.com>
+about: Store all your passwords
+args:
+  - create:
+      short: c
+      long: create
+      value_name: WALLET_NAME
+      help: Create a new empty wallet.
+      takes_value: true
+      requires: password
+
+  - read_all:
+      short: ra
+      long: read_all
+      value_name: WALLET_NAME
+      help: Returns all your password
+      takes_value: true
+      
+  - password:
+      short: p
+      long: password
+      value_name: PASSWORD
+      help: Specify your wallet password
+      takes_value: true
+
+  - list:
+      short: l
+      long: list
+      help: Lists all your wallets in "./wallets"
+      takes_value: false
+
+  - folder:
+      short: f
+      long: folder
+      value_name: FOLDER
+      help: Specify a folder
+      takes_value: true
