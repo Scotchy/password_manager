@@ -9,7 +9,7 @@ use crypto::buffer::{ ReadBuffer, WriteBuffer, BufferResult };
 
 #[derive(Debug)]
 #[derive(Serialize, Deserialize)]
-pub enum EncodedType {
+pub enum EncryptedType {
     Account { id : u32, name : String, password : String }, //Implement interior mutability with RefCell.
     Note { id : u32, name : String, content : String }
 }
@@ -23,9 +23,50 @@ pub struct EncryptedWallet {
 
 impl EncryptedWallet {
 
-    pub fn to_json(&self) -> Result<String, i32> {
-        let json = serde_json::to_string(&self).unwrap();
+    pub fn to_json(&self) -> Result<String, serde_json::error::Error> {
+        let json = serde_json::to_string(&self)?;
         Ok(json)
+    }
+    pub fn from_json(json : &str) -> Result<EncryptedWallet, serde_json::error::Error> {
+        let wallet : EncryptedWallet = serde_json::from_str(json)?;
+        Ok(wallet)
+    }
+    pub fn decrypt(&self, password : &str, iv : &[u8]) -> Result<Wallet, i32> {
+        let mut decryptor = aes::cbc_decryptor(
+            aes::KeySize::KeySize256,
+            password.as_bytes(),
+            iv,
+            blockmodes::PkcsPadding);  
+        
+        let encrypted_wallet = base64::decode(&self.encrypted_content).unwrap();
+
+        let mut final_result = Vec::<u8>::new();
+        let mut read_buffer = buffer::RefReadBuffer::new(encrypted_wallet.as_slice());
+        let mut buffer = [0; 4096];
+        let mut write_buffer = buffer::RefWriteBuffer::new(&mut buffer);
+
+        loop {
+            let result = decryptor.decrypt(&mut read_buffer, &mut write_buffer, true).unwrap();
+            final_result.extend(write_buffer.take_read_buffer().take_remaining().iter().map(|&i| i));
+            match result {
+                BufferResult::BufferUnderflow => break,
+                BufferResult::BufferOverflow => { }
+            }
+        }
+        let json = String::from_utf8(final_result).unwrap();
+        let wallet = Wallet::from_json(&json[..]).unwrap();
+        Ok(wallet)
+    }
+
+    pub fn save(&self, path : &str) -> Result<(), i32> {
+        let mut path = Path::new(path);
+        
+        if !path.is_file() {
+            return Err(1);
+        }
+        let mut file = File::create(path).unwrap();
+        file.write_all(self.to_json().unwrap().as_bytes());
+        Ok(())
     }
 }
 
@@ -33,8 +74,8 @@ impl EncryptedWallet {
 #[derive(Debug)]
 #[derive(Serialize, Deserialize)]
 pub struct Wallet {
-    name : String,
-    content : Vec<EncodedType>   
+    pub name : String,
+    pub content : Vec<EncryptedType>   
 }
 
 #[allow(dead_code)]
@@ -63,7 +104,6 @@ impl Wallet {
         path.push_str("/");
         path.push_str(&file[..]); 
         let path = Path::new(&path);
-        //let name = path.file_stem().unwrap().to_str().unwrap();
 
         let mut file = File::create(path).unwrap();
     
@@ -73,7 +113,7 @@ impl Wallet {
 
         let wallet = Wallet { name: name.to_string(), content : vec!() };
         
-        file.write_all(wallet.encrypt(password, b"iv").unwrap().to_json().unwrap().as_bytes()).unwrap();
+        file.write_all(wallet.encrypt(password, "iviviviviviviviv".as_bytes()).unwrap().to_json().unwrap().as_bytes()).unwrap();
         // Vecteur IV
         Ok(())
     }
@@ -94,11 +134,7 @@ impl Wallet {
         let mut write_buffer = buffer::RefWriteBuffer::new(&mut buffer);
         
         loop {
-            let result = match encryptor.encrypt(&mut read_buffer, &mut write_buffer, true) {
-                Ok(a) => a,
-                Err(e) => return Err(io::Error::from(io::ErrorKind::BrokenPipe))
-            };
-
+            let result = encryptor.encrypt(&mut read_buffer, &mut write_buffer, true).unwrap();
             encrypted_content.extend(write_buffer.take_read_buffer().take_remaining().iter().map(|&i| i));
 
             match result {
@@ -110,7 +146,7 @@ impl Wallet {
         Ok(EncryptedWallet { name : self.name.clone(), encrypted_content })
     }
 
-    pub fn open(path : String, password : &String) -> Result<Wallet, i32> {
+    pub fn open(path : &str, password : &str) -> Result<Wallet, i32> {
 
         let mut f = match File::open(path) {
             Ok(file) => file,
@@ -118,37 +154,44 @@ impl Wallet {
         };
         let mut v = String::new();
         f.read_to_string(&mut v).unwrap();
-
-        Ok( Wallet::from_json(&v[..]) )
+        let encrypted_wallet = EncryptedWallet::from_json(&v[..]).unwrap();
+        
+        let wallet = encrypted_wallet.decrypt(password, "iviviviviviviviv".as_bytes()).unwrap();
+        Ok( wallet )
     }
     
     pub fn add_note(&mut self, id : u32, name : String, content : String) {
-        self.content.push(EncodedType::Note { id, name, content });
+        self.content.push(EncryptedType::Note { id, name, content });
     }
 
     pub fn empty() -> Wallet {
         Wallet { name : String::new(), content : Vec::new() }
     }
 
-    fn to_json(&self) -> Result<String, i32> {
-        let json = serde_json::to_string(&self).unwrap();
+    fn to_json(&self) -> Result<String, serde_json::error::Error> {
+        let json = serde_json::to_string(&self)?;
         Ok(json)
     }
 
-    pub fn from_json(json : &str) -> Wallet {
-        let wallet : Wallet = serde_json::from_str(json).unwrap();
-        wallet
+    pub fn from_json(json : &str) -> Result<Wallet, serde_json::error::Error> {
+        let wallet : Wallet = serde_json::from_str(json)?;
+        Ok(wallet)
     }
 
-    pub fn get_by_id(&self, sid : u32) -> Option<&EncodedType> {
+    pub fn get_by_id(&self, sid : u32) -> Option<&EncryptedType> {
         for el in &self.content {
             match el {
-                EncodedType::Account { id, .. } if *id == sid => Some(el),
-                EncodedType::Note { id, .. } if *id == sid=> Some(el),
+                EncryptedType::Account { id, .. } if *id == sid => Some(el),
+                EncryptedType::Note { id, .. } if *id == sid=> Some(el),
                 _ => continue
             };
         }
         None
+    }
+
+    pub fn save(&self, path : &str, password : &str, iv : &[u8]) {
+        let encrypted = self.encrypt(password, iv).unwrap(); 
+        encrypted.save(path);
     }
 
     pub fn delete_permanently(password : &String) -> Result<(), i32> {
@@ -166,7 +209,7 @@ impl WalletManager {
         WalletManager { wallets : Vec::new() }
     }
 
-    pub fn open_wallet(&mut self, path : String, password : &String) {
+    pub fn open_wallet(&mut self, path : &str, password : &str) {
         let wallet = Wallet::open(path, password).unwrap();
         self.wallets.push(wallet);
     }

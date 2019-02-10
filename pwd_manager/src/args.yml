@@ -3,6 +3,12 @@ version: "0.1.0"
 author: Drosos <sarradro@gmail.com>
 about: Store all your passwords
 args:
+  - open_from_path: 
+      index: 1
+      required: false
+      help: Open a wallet from a file path.
+      conflicts_with: [open, list, folder]
+
   - create:
       short: c
       long: create
@@ -10,26 +16,71 @@ args:
       help: Create a new empty wallet.
       takes_value: true
       requires: password
+      conflicts_with: [open, read_passwords, read_notes, list, list_notes, change_master]
 
-  - read_all:
-      short: ra
-      long: read_all
+  - open:
+      short: o
+      long: open
       value_name: WALLET_NAME
-      help: Returns all your password
+      help: Open a wallet
       takes_value: true
-      
+      requires: password
+      conflicts_with: [list, folder]
+
+  - read_passwords:
+      short: r
+      long: read-passwords
+      help: Returns all your password
+      #requires: open
+      takes_value: false
+
+  - read_notes:
+      short: n
+      long: read_notes
+      requires: open
+      help: Returns all your notes
+      takes_value: false
+
   - password:
       short: p
       long: password
       value_name: PASSWORD
-      help: Specify your wallet password
+      help: Specify your wallet passwords
       takes_value: true
-
+  
   - list:
       short: l
       long: list
       help: Lists all your wallets in "./wallets"
       takes_value: false
+      requires: open
+  
+  - list_notes:
+      long: ln
+      takes_value: false
+      requires: open
+      help: List notes names.
+  
+  - add_password: 
+      short: a
+      long: add-password
+      value_name: "PASSWORD"
+      takes_value: true
+      help: Add a password
+      requires: [open, label]
+  
+  - label:
+      long: lab
+      value_name: "LABEL"
+      takes_value: true
+      help: Label of the password
+  
+  - change_master:
+      long: change-master
+      value_name: NEW_MASTER_PASSWORD
+      takes_value: true
+      help: Change your master password.
+      requires: open
 
   - folder:
       short: f
