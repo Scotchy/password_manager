@@ -9,7 +9,6 @@ extern crate base64;
 extern crate clap;
 
 mod wallet_manager;
-mod lib; 
 
 use std::io::{self, Write, Read};
 use std::fs::File;
