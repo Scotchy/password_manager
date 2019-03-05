@@ -133,7 +133,7 @@ impl Wallet {
         // Vecteur IV
         Ok(())
     }
-
+    
     pub fn encrypt(&self, password : &str) -> Result<EncryptedWallet, io::Error> {
         let mut gen = rand::thread_rng();
         let mut iv : [u8; 16] = [0; 16];
